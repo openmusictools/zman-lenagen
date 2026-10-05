@@ -1,0 +1,65 @@
+name: Test, build and release
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test timing and statistics
+        run: dotnet run --project tests/ZmanLenagen.Tests -c Release
+      - name: Test SQLite persistence and imports
+        run: dotnet run --project tests/ZmanLenagen.StorageTests -c Release
+      - name: Publish standalone Windows app
+        shell: pwsh
+        run: |
+          $version = '1.0.0'
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}'.TrimStart('v')
+            if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Use a tag such as v1.0.0' }
+          }
+          dotnet publish src/ZmanLenagen.App -c Release -r win-x64 --self-contained true -p:Version=$version -o publish
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "APP_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:APP_VERSION" installer/setup.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $hash = (Get-FileHash dist/ZmanLenagen-Setup.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  ZmanLenagen-Setup.exe" | Set-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZmanLenagen-Windows-installer
+          path: dist/*
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ZmanLenagen-Windows-installer
+          path: dist
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "זמן לנגן $TAG" --generate-notes
+          fi
