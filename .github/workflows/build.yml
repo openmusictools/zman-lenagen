@@ -24,7 +24,7 @@ jobs:
       - name: Publish standalone Windows app
         shell: pwsh
         run: |
-          $version = '1.1.0'
+          $version = '1.1.1'
           if ('${{ github.ref_type }}' -eq 'tag') {
             $version = '${{ github.ref_name }}'.TrimStart('v')
             if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Use a tag such as v1.0.0' }
