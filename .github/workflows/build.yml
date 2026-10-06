@@ -19,10 +19,12 @@ jobs:
         run: dotnet run --project tests/ZmanLenagen.Tests -c Release
       - name: Test SQLite persistence and imports
         run: dotnet run --project tests/ZmanLenagen.StorageTests -c Release
+      - name: Test recording retention, recovery and exports
+        run: dotnet run --project tests/ZmanLenagen.AudioTests -c Release
       - name: Publish standalone Windows app
         shell: pwsh
         run: |
-          $version = '1.0.0'
+          $version = '1.1.0'
           if ('${{ github.ref_type }}' -eq 'tag') {
             $version = '${{ github.ref_name }}'.TrimStart('v')
             if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Use a tag such as v1.0.0' }
