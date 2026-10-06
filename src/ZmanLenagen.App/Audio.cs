@@ -64,7 +64,7 @@ sealed class RecorderAudio : IDisposable {
  }
  public void Play(Recording r) {
   StopPlayback();var audio=new AudioFileReader(archive.Wav(r));var output=new WaveOutEvent();
-  try {output.Init(audio);reader=audio;playback=output;PlayingId=r.Id;output.PlaybackStopped+=(s,e)=>{PlayingId=null;};output.Play();}
+  try {output.Init(audio);reader=audio;playback=output;PlayingId=r.Id;output.PlaybackStopped+=(s,e)=>{if(ReferenceEquals(output,playback))PlayingId=null;};output.Play();}
   catch{output.Dispose();audio.Dispose();throw;}
  }
  public void StopPlayback(){PlayingId=null;var p=playback;playback=null;if(p!=null){p.Stop();p.Dispose();}reader?.Dispose();reader=null;}
