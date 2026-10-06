@@ -16,4 +16,17 @@ try{Metrics.ValidateCircuit([]);throw new Exception("Empty accepted");}catch(Arg
 var zone=TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows()?"Israel Standard Time":"Asia/Jerusalem");
 step.Feedback="yes";step.Segments=[new(new DateTimeOffset(2026,10,24,20,0,0,TimeSpan.Zero),new DateTimeOffset(2026,10,25,5,0,0,TimeSpan.Zero))];
 Equal(step.CreditedSeconds,Metrics.Daily([step],zone).Values.Sum());
+
+
+Equal(12,Fifths.Keys.Count);Equal(1,Fifths.Keys.Count(k=>k.Major.Contains('/')));Equal("E♭m / D♯m",Fifths.Keys[6].Minor);
+var taps=new TapTempo();Equal<int?>(null,taps.Tap(0));Equal<int?>(120,taps.Tap(.5));Equal<int?>(120,taps.Tap(1));Equal<int?>(null,taps.Tap(5));Equal<int?>(60,taps.Tap(6));
+// Ten minutes at 137 BPM with triplets: awkward fractional periods must not drift.
+var track=new ClickTrack(137,4,3,0,true);var block=new float[48000];
+for(int i=0;i<600;i++)track.Read(block);
+Equal(28800000L,track.Samples);Equal(4110L,track.Pulses);
+// Callback buffer boundaries must not alter the audio stream.
+var a=new ClickTrack(123,6,2,1,true);var b=new ClickTrack(123,6,2,1,true);
+var large=new float[24000];var pieces=new float[24000];a.Read(large);
+for(int i=0;i<pieces.Length;i+=137)b.Read(pieces.AsSpan(i,Math.Min(137,pieces.Length-i)));
+Equal(true,large.SequenceEqual(pieces));
 Console.WriteLine($"Passed {count} assertions.");
