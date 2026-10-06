@@ -26,11 +26,13 @@ public sealed class MainWindow : Window {
  List<string> tags;
  List<int> minutes;
  bool closing;
+ readonly PracticeTools tools;
  public MainWindow() {
-  Title="זמן לנגן";Width=1040;Height=780;MinWidth=740;MinHeight=580;
+  Title="זמן לנגן";Width=1040;Height=920;MinWidth=980;MinHeight=760;
   FlowDirection=FlowDirection.RightToLeft;FontFamily=new FontFamily("Segoe UI");FontSize=16;
   Background=Brush("#F7F6FF");Foreground=Brush("#292742");
-  Content=new ScrollViewer{Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+  tools=new PracticeTools(store,()=>run?.Step,Recordings);
+  var layout=new DockPanel();DockPanel.SetDock(tools,Dock.Bottom);layout.Children.Add(tools);layout.Children.Add(new ScrollViewer{Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});Content=layout;
   circuits=store.Get<List<List<Exercise>>>("circuits")??[];tags=store.Get<List<string>>("tags")??[];minutes=store.Get<List<int>>("minutes")??[];
   run=store.Get<RunState>("run");
   if(run!=null) {
@@ -43,7 +45,7 @@ public sealed class MainWindow : Window {
    if(closing)return;
    if(run?.Step!=null&&!run.AwaitingFeedback&&!run.Paused) Pause();
    if(run!=null && MessageBox.Show("לסגור עכשיו? המעגל יישמר ותוכל להמשיך ממנו בפעם הבאה.","נתראה בקרוב",MessageBoxButton.YesNo)!=MessageBoxResult.Yes){e.Cancel=true;return;}
-   closing=true;heartbeat.Stop();SystemEvents.SessionSwitch-=SessionSwitch;SystemEvents.PowerModeChanged-=PowerChanged;store.Dispose();
+   closing=true;tools.Dispose();heartbeat.Stop();SystemEvents.SessionSwitch-=SessionSwitch;SystemEvents.PowerModeChanged-=PowerChanged;store.Dispose();
   };
   Home();
  }
@@ -62,7 +64,7 @@ public sealed class MainWindow : Window {
   if(run!=null) actions.Children.Add(Button("המשך המעגל השמור",ShowRun,"#BCEEDB"));
   else actions.Children.Add(Button("בוא נתחיל את האימון",()=>Editor(),"#BCEEDB"));
   actions.Children.Add(Button("הורד את כל הנתונים",Export));actions.Children.Add(Button("ייבוא גיבוי",Import));
-  actions.Children.Add(Button("ניהול נתונים",Manage));
+  actions.Children.Add(Button("כל ההקלטות",Recordings));actions.Children.Add(Button("ניהול נתונים",Manage));
   var steps=store.Steps();var daily=Metrics.Daily(steps,TimeZoneInfo.Local);var today=DateOnly.FromDateTime(DateTime.Now);
   var last=steps.FirstOrDefault(x=>x.Feedback!=null);
   var lastSession=last==null?new List<PracticeStep>():steps.Where(x=>x.SessionId==last.SessionId).ToList();
@@ -187,7 +189,7 @@ public sealed class MainWindow : Window {
    if(value=="no"){Save("");return;}
    detail.Children.Add(Text("על מה התאמנת?"));var notes=new TextBox{AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,MinHeight=90,MaxLength=4000,Text=step.Notes};detail.Children.Add(notes);notes.TextChanged+=(s,e)=>{step.Notes=notes.Text;store.Save(run,step);};
    detail.Children.Add(Button("שמור והמשך",()=>Save(notes.Text.Trim()),"#BCEEDB"));
-   void Save(string text){step.Feedback=value;step.Notes=text;store.Save(run,step);done();}
+   void Save(string text){step.Feedback=value;step.Notes=text;store.Save(run,step);tools.FeedbackSaved(step);done();}
   }
   choice.Children.Add(Button("כן",()=>Choose("yes")));choice.Children.Add(Button("לא",()=>Choose("no")));choice.Children.Add(Button("חצי־חצי",()=>Choose("half")));
  }
@@ -199,8 +201,8 @@ public sealed class MainWindow : Window {
   page.Children.Add(Button("התחל מהתחלה",()=>{var c=run.Circuit;run=new RunState{Circuit=c};store.Save(run);StartStep();},"#BCEEDB"));
   page.Children.Add(Button("סיים",()=>{run=null;store.Save(null);store.Backup();Home();}));
  }
- void SessionSwitch(object sender,SessionSwitchEventArgs e) {if(e.Reason==SessionSwitchReason.SessionLock)Dispatcher.Invoke(()=>{Pause();if(timerText!=null)ShowRun();});}
- void PowerChanged(object sender,PowerModeChangedEventArgs e) {if(e.Mode==PowerModes.Suspend)Dispatcher.Invoke(()=>{Pause();if(timerText!=null)ShowRun();});}
+ void SessionSwitch(object sender,SessionSwitchEventArgs e) {if(e.Reason==SessionSwitchReason.SessionLock)Dispatcher.Invoke(()=>{tools.Suspend();Pause();if(timerText!=null)ShowRun();});}
+ void PowerChanged(object sender,PowerModeChangedEventArgs e) {if(e.Mode==PowerModes.Suspend)Dispatcher.Invoke(()=>{tools.Suspend();Pause();if(timerText!=null)ShowRun();});}
  void Export() {
   var dialog=new SaveFileDialog{FileName="zman-lenagen-"+DateTime.Now.ToString("yyyy-MM-dd"),Filter="גיבוי מלא JSON|*.json|טבלת אימונים CSV|*.csv"};if(dialog.ShowDialog()!=true)return;
   var steps=store.Steps();string text;
@@ -218,12 +220,13 @@ public sealed class MainWindow : Window {
   var data=JsonSerializer.Deserialize<ExportData>(File.ReadAllText(dialog.FileName))??throw new ArgumentException("קובץ לא תקין.");
   store.Import(data);tags=store.Get<List<string>>("tags")??[];minutes=store.Get<List<int>>("minutes")??[];circuits=store.Get<List<List<Exercise>>>("circuits")??[];Home();MessageBox.Show("הגיבוי יובא. שלבים שכבר קיימים לא נוספו שוב.");
  }
+ void Recordings() {Clear("ההקלטות שלך","רגעים מהנגינה, במקום אחד.");page.Children.Add(Button("חזרה הביתה",Home));tools.ShowArchive(page);}
  void Manage() {
   Clear("הנתונים שלך","ההיסטוריה נשמרת בחשבון Windows שלך. הסרת התוכנה משאירה אותה כדי שתוכל לחזור בעתיד.");
   page.Children.Add(Button("פתח תיקיית נתונים וגיבויים",()=>Process.Start(new ProcessStartInfo(Store.Folder){UseShellExecute=true})));
   page.Children.Add(Button("מחק את כל הנתונים וסגור",()=>{
    if(MessageBox.Show("למחוק לצמיתות את ההיסטוריה, המעגלים והגיבויים בחשבון זה? כדאי לייצא קודם. הפעולה אינה ניתנת לביטול.","מחיקת נתונים",MessageBoxButton.YesNo,MessageBoxImage.Warning)!=MessageBoxResult.Yes)return;
-   Pause();heartbeat.Stop();store.Dispose();Directory.Delete(Store.Folder,true);ToastNotificationManagerCompat.Uninstall();closing=true;SystemEvents.SessionSwitch-=SessionSwitch;SystemEvents.PowerModeChanged-=PowerChanged;Close();
+   Pause();tools.Dispose();heartbeat.Stop();store.Dispose();Directory.Delete(Store.Folder,true);ToastNotificationManagerCompat.Uninstall();closing=true;SystemEvents.SessionSwitch-=SessionSwitch;SystemEvents.PowerModeChanged-=PowerChanged;Close();
   },"#FFD5DF"));page.Children.Add(Button("חזרה",Home));
  }
 }
