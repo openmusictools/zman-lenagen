@@ -9,6 +9,7 @@ using Microsoft.Win32;
 using ZmanLenagen.Core;
 namespace ZmanLenagen.App;
 sealed class PracticeTools : Grid, IDisposable {
+ readonly Viewbox circleView=new(){Stretch=Stretch.Uniform,Height=300};
  readonly Store store;readonly Func<PracticeStep?> context;readonly Action openArchive;
  readonly RecordingArchive archive;readonly RecorderAudio recorder;readonly MetronomeAudio metronome=new();
  readonly DispatcherTimer pulse=new(){Interval=TimeSpan.FromMilliseconds(30)};
@@ -61,7 +62,7 @@ sealed class PracticeTools : Grid, IDisposable {
    Note(key.Major,166,false);Note(key.Minor,111,true);
   }
   var random=Btn("סולם\nאקראי",()=>{var n=Random.Shared.Next(24);var b=selections[n];Select(b,n%2==0?Fifths.Keys[n/2].Major:Fifths.Keys[n/2].Minor,n%2!=0);});random.Width=84;random.Height=62;random.FontSize=15;random.Padding=new Thickness(4);Canvas.SetLeft(random,188);Canvas.SetTop(random,199);canvas.Children.Add(random);
-  middle.Children.Add(new Viewbox{Child=canvas,Stretch=Stretch.Uniform,Height=300});middle.Children.Add(scaleStatus);
+  circleView.Child=canvas;middle.Children.Add(circleView);middle.Children.Add(scaleStatus);
   var right=Card(2);right.Children.Add(Label("מקליט קול",20));right.Children.Add(Label("תפוס את הרגע. אפשר להקשיב מיד."));
   recordButton=Btn("● הקלט",ToggleRecording);recordButton.Background=Color("#FFD8E0");right.Children.Add(recordButton);
   playButton=Btn("▶ השמע הקלטה אחרונה",()=>{if(recorder.PlayingId!=null)recorder.StopPlayback();else if(latest!=null)recorder.Play(latest);UpdateRecording();});right.Children.Add(playButton);right.Children.Add(recordStatus);
@@ -105,6 +106,7 @@ sealed class PracticeTools : Grid, IDisposable {
   }
  }
  static string Feedback(string? value)=>value switch{"yes"=>"כן","half"=>"חצי־חצי","no"=>"לא",_=>"טרם נוסף"};
+ public void Resize(double windowHeight){Height=Math.Clamp(windowHeight*.44,210,390);circleView.Height=Math.Max(130,Height-90);}
  public void Suspend(){StopMetronome();recorder.Stop();recorder.StopPlayback();}
  public void Dispose(){if(disposed)return;disposed=true;pulse.Stop();retention.Stop();metronome.Dispose();recorder.Dispose();}
 }

@@ -28,11 +28,12 @@ public sealed class MainWindow : Window {
  bool closing;
  readonly PracticeTools tools;
  public MainWindow() {
-  Title="זמן לנגן";Width=1040;Height=920;MinWidth=980;MinHeight=760;
+  Title="זמן לנגן";Width=Math.Min(1040,SystemParameters.WorkArea.Width*.94);Height=Math.Min(920,SystemParameters.WorkArea.Height*.94);MinWidth=Math.Min(840,SystemParameters.WorkArea.Width*.85);MinHeight=Math.Min(520,SystemParameters.WorkArea.Height*.85);
   FlowDirection=FlowDirection.RightToLeft;FontFamily=new FontFamily("Segoe UI");FontSize=16;
   Background=Brush("#F7F6FF");Foreground=Brush("#292742");
   tools=new PracticeTools(store,()=>run?.Step,Recordings);
   var layout=new DockPanel();DockPanel.SetDock(tools,Dock.Bottom);layout.Children.Add(tools);layout.Children.Add(new ScrollViewer{Content=page,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});Content=layout;
+  SizeChanged+=(s,e)=>tools.Resize(ActualHeight);tools.Resize(Height);
   circuits=store.Get<List<List<Exercise>>>("circuits")??[];tags=store.Get<List<string>>("tags")??[];minutes=store.Get<List<int>>("minutes")??[];
   run=store.Get<RunState>("run");
   if(run!=null) {
