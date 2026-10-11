@@ -2,7 +2,7 @@ name: Download website
 on:
   push:
     branches: [main]
-    paths: ['index.html', '.github/workflows/pages.yml']
+    paths: ['index.html', 'favicon.svg', 'sitemap.xml', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +25,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           mkdir public
+          cp favicon.svg sitemap.xml public/
           sed "s|OWNER/REPOSITORY|$REPOSITORY|g" index.html > public/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
